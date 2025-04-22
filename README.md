@@ -23,7 +23,7 @@ A ideia do Autodoc é ser executado diretamente via um app (ou CLI) conectado ao
 
 ## 🧪 Status
 
-Este projeto ainda está em fase **teórica/conceitual**. Nenhuma linha de código foi escrita ainda, mas a ideia está sendo discutida e lapidada via [issues](https://github.com/seu-usuario/autodoc/issues).
+Este projeto ainda está em fase **teórica/conceitual**. Nenhuma linha de código foi escrita ainda, mas a ideia está sendo discutida e lapidada via [issues](https://github.com/apenasgabs/autodoc/issues).
 
 ---
 
@@ -44,7 +44,7 @@ Facilitar o onboarding de pessoas desenvolvedoras em repositórios — seja em p
 
 ## Contribuindo
 
-Ainda estamos na fase de discussão da arquitetura. Se você curte a ideia, abre uma [issue](https://github.com/seu-usuario/autodoc/issues) com sugestões, cenários de uso ou tecnologias que poderiam ajudar.
+Ainda estamos na fase de discussão da arquitetura. Se você curte a ideia, abre uma [issue](https://github.com/apenasgabs/autodoc/issues) com sugestões, cenários de uso ou tecnologias que poderiam ajudar.
 
 ---
 
