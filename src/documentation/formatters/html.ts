@@ -1,10 +1,10 @@
-import marked from "marked";
+import * as marked from "marked";
 import { DocumentationFormatter } from "../generator";
 
 export class HtmlFormatter implements DocumentationFormatter {
   formatDocumentation(title: string, content: string): string {
     // Converte o markdown para HTML
-    const htmlContent = marked.parse(content);
+    const htmlContent = marked.marked(content);
 
     return `<!DOCTYPE html>
 <html lang="pt-BR">

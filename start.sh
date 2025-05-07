@@ -1,4 +1,40 @@
 #!/bin/bash
+# Adicione essas linhas à seção de ajuda:
+echo "  -m, --model MODEL     Nome do modelo Ollama a ser usado (para modo local)"
+echo "  --ollama-url URL      URL da API Ollama (padrão: http://localhost:11434)"
+
+# Adicione essas opções ao parser de argumentos do script:
+OLLAMA_MODEL=""
+OLLAMA_URL="http://localhost:11434"
+
+# Depois do bloco case $1 in, adicione:
+    -m|--model)
+      OLLAMA_MODEL="$2"
+      shift 2
+      ;;
+    --ollama-url)
+      OLLAMA_URL="$2"
+      shift 2
+      ;;
+
+# Adicione ao bloco de atualização do arquivo .env:
+if [ -n "$OLLAMA_MODEL" ]; then
+  sed -i.bak "s/^OLLAMA_MODEL=.*/OLLAMA_MODEL=$OLLAMA_MODEL/" .env || echo "OLLAMA_MODEL=$OLLAMA_MODEL" >> .env
+fi
+
+if [ -n "$OLLAMA_URL" ]; then
+  sed -i.bak "s/^OLLAMA_URL=.*/OLLAMA_URL=$OLLAMA_URL/" .env || echo "OLLAMA_URL=$OLLAMA_URL" >> .env
+fi
+
+# Modifique a verificação de requisitos para acomodar o modo local com Ollama:
+if grep -q "LLM_TYPE=local" .env && ! grep -q "OLLAMA_MODEL=." .env; then
+  error "Modelo Ollama não configurado para uso local. Use -m/--model ou configure OLLAMA_MODEL no arquivo .env"
+fi
+
+# Adicione isso ao bloco de exibição da configuração:
+if grep -q "LLM_TYPE=local" .env; then
+  echo -e "- Modelo Ollama: $(grep OLLAMA_MODEL .env | cut -d= -f2 || echo 'não definido')"
+fi
 
 # Script para facilitar a execução do gerador de documentação
 

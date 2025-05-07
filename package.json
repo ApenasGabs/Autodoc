@@ -4,8 +4,8 @@
   "description": "Gerador de documentação automática para repositórios GitHub usando IA",
   "main": "dist/index.js",
   "scripts": {
-    "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
+    "start": "node --max-old-space-size=8192 dist/index.js",
+    "dev": "NODE_OPTIONS=--max-old-space-size=8192 ts-node src/index.ts",
     "build": "tsc",
     "watch": "tsc -w",
     "lint": "eslint src --ext .ts",

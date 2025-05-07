@@ -1,11 +1,13 @@
 import fs from "fs/promises";
-import glob from "glob";
+import * as globModule from "glob";
 import path from "path";
 import config from "../config";
 import { batchProcess } from "../utils/batching";
 import { createLogger } from "../utils/logger";
 
 const logger = createLogger("RepoProcessor");
+// Usar a função glob diretamente do módulo
+const { glob } = globModule;
 
 export interface ProcessedFile {
   path: string;
@@ -26,11 +28,15 @@ export class RepoProcessor {
       const files = await this.getAllFiles(repoPath);
       logger.info(`Encontrados ${files.length} arquivos para processar`);
 
+      // Reduzir o tamanho do lote para evitar problemas de memória
+      const batchSize = Math.min(5, config.processing.maxConcurrentProcesses);
+      logger.info(`Usando tamanho de lote: ${batchSize} para processamento`);
+
       // Processar arquivos em lotes para evitar sobrecarga de memória
       const processedFiles = await batchProcess(
         files,
         async (file) => this.processFile(file, repoPath),
-        config.processing.maxConcurrentProcesses
+        batchSize
       );
 
       return processedFiles.filter(Boolean) as ProcessedFile[];
@@ -48,16 +54,36 @@ export class RepoProcessor {
       (pattern) => `**/${pattern}/**`
     );
 
-    return new Promise((resolve, reject) => {
-      glob(
+    // Adicionar mais padrões de exclusão para arquivos que podem causar problemas de memória
+    const additionalExclusions = [
+      "**/*.min.js",
+      "**/*.bundle.js",
+      "**/*.map",
+      "**/*.svg",
+      "**/*.woff",
+      "**/*.woff2",
+      "**/*.ttf",
+      "**/*.eot",
+      "**/*.jpg",
+      "**/*.jpeg",
+      "**/*.png",
+      "**/*.gif",
+      "**/*.ico",
+      "**/*.lock",
+    ];
+
+    const allExclusions = [...excludePatterns, ...additionalExclusions];
+
+    return new Promise<string[]>((resolve, reject) => {
+      globModule.glob(
         "**/*.*",
         {
           cwd: repoPath,
-          ignore: excludePatterns,
+          ignore: allExclusions,
           nodir: true,
           absolute: true,
         },
-        (err, files) => {
+        (err: Error | null, files: string[]) => {
           if (err) reject(err);
           else resolve(files);
         }
@@ -75,13 +101,53 @@ export class RepoProcessor {
     try {
       const stats = await fs.stat(filePath);
 
+      // Reduzir o tamanho máximo de arquivo para prevenir problemas de memória
+      const maxSizeKb = Math.min(250, config.processing.maxFileSizeKb);
+
       // Pular arquivos muito grandes
-      if (stats.size > config.processing.maxFileSizeKb * 1024) {
-        logger.warn(`Arquivo muito grande, pulando: ${filePath}`);
+      if (stats.size > maxSizeKb * 1024) {
+        logger.warn(
+          `Arquivo muito grande (${Math.round(
+            stats.size / 1024
+          )}KB), pulando: ${filePath}`
+        );
         return null;
       }
 
-      const content = await fs.readFile(filePath, "utf-8");
+      // Usar um limite de conteúdo para arquivos grandes
+      const MAX_CONTENT_LENGTH = 500 * 1024; // 500 KB máximo
+
+      let content: string;
+      if (stats.size > MAX_CONTENT_LENGTH) {
+        // Para arquivos grandes, ler apenas o início e o final
+        const buffer = Buffer.alloc(MAX_CONTENT_LENGTH);
+        const fd = await fs.open(filePath, "r");
+
+        try {
+          // Ler o início do arquivo
+          await fd.read(buffer, 0, MAX_CONTENT_LENGTH / 2, 0);
+
+          // Ler o final do arquivo
+          await fd.read(
+            buffer,
+            MAX_CONTENT_LENGTH / 2,
+            MAX_CONTENT_LENGTH / 2,
+            Math.max(0, stats.size - MAX_CONTENT_LENGTH / 2)
+          );
+
+          content = buffer.toString("utf-8");
+          content =
+            content.slice(0, MAX_CONTENT_LENGTH / 2) +
+            "\n\n... [conteúdo truncado devido ao tamanho do arquivo] ...\n\n" +
+            content.slice(MAX_CONTENT_LENGTH / 2);
+        } finally {
+          await fd.close();
+        }
+      } else {
+        // Para arquivos menores, ler normalmente
+        content = await fs.readFile(filePath, "utf-8");
+      }
+
       const relativePath = path.relative(repoPath, filePath);
       const extension = path.extname(filePath).substring(1);
 

@@ -1,68 +1,84 @@
+import axios from "axios";
 import { createLogger } from "../utils/logger";
 import { LLMInterface } from "./model-loader";
 
 const logger = createLogger("LocalLLM");
 
 export class LocalLLM implements LLMInterface {
-  private modelPath: string;
+  private modelName: string;
+  private ollamaUrl: string;
 
-  constructor(modelPath: string) {
-    this.modelPath = modelPath;
-    logger.info(`Inicializando modelo local a partir de: ${modelPath}`);
+  constructor(modelName: string, ollamaUrl: string = "http://localhost:11434") {
+    this.modelName = modelName;
+    this.ollamaUrl = ollamaUrl;
+    logger.info(`Inicializando modelo Ollama: ${modelName} via ${ollamaUrl}`);
   }
 
   async initialize() {
     try {
-      // Aqui você implementaria a inicialização do modelo local
-      // Exemplo com llama-node (requer instalação)
-      /*
-      import { LlamaModel, LlamaContext, LlamaChatSession } from 'llama-node';
-      
-      const model = new LlamaModel({
-        modelPath: this.modelPath,
-        contextSize: 2048,
-        batchSize: 512,
-      });
-      
-      await model.load();
-      this.model = model;
-      */
+      // Verificar se o modelo está disponível no Ollama
+      const response = await axios.get(`${this.ollamaUrl}/api/tags`);
+      const availableModels = response.data.models || [];
+      const modelExists = availableModels.some(
+        (model: any) => model.name === this.modelName
+      );
 
-      logger.info("Modelo local inicializado com sucesso");
+      if (!modelExists) {
+        logger.warn(
+          `Modelo ${
+            this.modelName
+          } não encontrado no Ollama. Disponíveis: ${availableModels
+            .map((m: any) => m.name)
+            .join(", ")}`
+        );
+      } else {
+        logger.info(`Modelo ${this.modelName} encontrado no Ollama`);
+      }
     } catch (error) {
-      logger.error(`Erro ao inicializar modelo local: ${error}`);
-      throw new Error(`Falha ao inicializar modelo local: ${error}`);
+      logger.error(`Erro ao verificar modelos disponíveis no Ollama: ${error}`);
+      logger.warn(
+        "Verifique se o Ollama está em execução em " + this.ollamaUrl
+      );
     }
   }
 
   async generateCompletion(prompt: string): Promise<string> {
     try {
-      // Implementação simplificada - substitua pela integração real com o modelo local
       logger.info(
-        `Gerando completamento para prompt com ${prompt.length} caracteres`
+        `Gerando completamento com Ollama (${this.modelName}) para prompt com ${prompt.length} caracteres`
       );
 
-      // Aqui você implementaria a chamada ao modelo local
-      // Exemplo com llama-node:
-      /*
-      const context = new LlamaContext({ model: this.model });
-      const session = new LlamaChatSession({ context });
-      const response = await session.prompt(prompt);
-      return response;
-      */
+      const response = await axios.post(`${this.ollamaUrl}/api/generate`, {
+        model: this.modelName,
+        prompt: prompt,
+        stream: false,
+        options: {
+          temperature: 0.1, // Diminuir para resultados mais determinísticos
+          num_predict: 4096, // Aumentar para respostas mais longas
+          stop: ["```", "</code>"], // Adicionar tokens de parada para melhor formatação
+          top_p: 0.9, // Ajuste de diversidade do texto
+          top_k: 40, // Ajuste de variedade dos tokens
+        },
+      });
 
-      // Implementação temporária
-      logger.warn("Usando implementação temporária de LLM local");
-      return "Este é um texto temporário gerado pelo modelo local. Implementação real necessária.";
-    } catch (error) {
-      logger.error(`Erro ao gerar texto com modelo local: ${error}`);
-      throw new Error(`Falha ao gerar texto com modelo local: ${error}`);
+      // Ollama retorna o texto gerado em resposta.data.response
+      return response.data.response;
+    } catch (error: any) {
+      logger.error(`Erro ao gerar texto com Ollama: ${error.message}`);
+      if (error.response) {
+        logger.error(`Detalhes: ${JSON.stringify(error.response.data)}`);
+      }
+      throw new Error(
+        `Falha ao gerar texto com modelo local: ${error.message}`
+      );
     }
   }
 
   async batchProcess(prompts: string[]): Promise<string[]> {
     const results: string[] = [];
+    logger.info(`Processando batch de ${prompts.length} prompts com Ollama`);
 
+    // Com Ollama, melhor processar serialmente para não sobrecarregar
     for (const prompt of prompts) {
       results.push(await this.generateCompletion(prompt));
     }
