@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  repo-doc-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: repo-doc-generator
+    env_file:
+      - .env
+    volumes:
+      - ./output:/app/output
+    restart: "no"
+    # Limite de recursos para máquinas com hardware limitado
+    deploy:
+      resources:
+        limits:
+          memory: 12G # Limite máximo de memória
+          cpus: "2" # Limite de CPUs
+    # Se precisar passar argumentos diretamente para o comando
+    # command: ["node", "dist/index.js", "owner", "repo", "branch"]
